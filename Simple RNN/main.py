@@ -1,7 +1,7 @@
 import MS_Model_RNN
 import numpy as np
 
-obj = MS_Model_RNN.MS_Model_RNN(max_val = 0.08)
+obj = MS_Model_RNN.MS_Model_RNN(n_a=64,max_val = 0.08)
 
 obj.load_data()
 
@@ -24,7 +24,7 @@ gradients = {"dWya":dWya,"dWaa":dWaa,"dWax":dWax,"dba":dba,"dby":dby}
 new_grad = obj.gradient_clip(gradients,max_val=0.0001)
 """
 
-parameters ,a = obj.model(obj.Train_Data_X,obj.Train_Data_Y,num_iterations =1,print_cost=True)
+parameters ,a = obj.model(obj.Train_Data_X,obj.Train_Data_Y,num_iterations =130,print_cost=True)
 
 Waa = parameters["Waa"]
 Wax = parameters["Wax"]

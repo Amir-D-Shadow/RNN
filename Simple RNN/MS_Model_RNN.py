@@ -333,7 +333,7 @@ class MS_Model_RNN:
         return parameters,loss,a[-1]
 
 
-    def model(self,X,Y,num_iterations = 250,print_cost= False):
+    def model(self,X,Y,learning_rate=0.01,num_iterations = 250,print_cost= False):
 
         parameters = self.initial_parameters(self.n_a,self.n_x,self.n_y)
 
@@ -343,9 +343,9 @@ class MS_Model_RNN:
 
         for i in range(num_iterations):
 
-            parameters,curr_loss,a_prev = self.optimize(parameters,a_prev,X,Y,learning_rate=0.005)
+            parameters,curr_loss,a_prev = self.optimize(parameters,a_prev,X,Y,learning_rate=learning_rate)
 
-            loss = loss*0.999 + curr_loss*0.001
+            loss = (loss*0.999 + curr_loss*0.001)/Y.shape[0]
 
             if print_cost and (i%50 == 0):
 

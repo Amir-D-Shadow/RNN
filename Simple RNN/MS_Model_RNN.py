@@ -79,6 +79,88 @@ class MS_Model_RNN:
 
         return drelu
 
+    def initialize_Adam(self,parameters):
+
+        v = {}
+        s = {}
+
+        Waa = parameters["Waa"]
+        Wax = parameters["Wax"]
+        Wya = parameters["Wya"]
+        ba = parameters["ba"]
+        by = parameters["by"]
+
+        v["dWaa"] = np.zeros_like(Waa)
+        v["dWax"] = np.zeros_like(Wax)
+        v["dWya"] = np.zeros_like(Wya)
+        v["dba"] = np.zeros_like(ba)
+        v["dby"] = np.zeros_like(by)
+
+        s["dWaa"] = np.zeros_like(Waa)
+        s["dWax"] = np.zeros_like(Wax)
+        s["dWya"] = np.zeros_like(Wya)
+        s["dba"] = np.zeros_like(ba)
+        s["dby"] = np.zeros_like(by)
+
+        return v,s
+
+    def update_parameters_with_Adam(self,gradients,parameters,v,s,t,learning_rate,beta1,beta2,eplison):
+
+        """
+        Adam update parameters per ITERATIONS!!!
+
+        """
+
+        #Important: v,s and v_corrected,s_corrected should be treated separately
+        v_corrected = {}
+        s_corrected = {}
+
+        dWya = gradients["dWya"]
+        dWaa = gradients["dWaa"]
+        dWax = gradients["dWax"]
+        dba =  gradients["dba"]
+        dby = gradients["dby"]
+
+
+        #Update v
+        v["dWaa"] = beta1*v["dWaa"] + (1-beta1)*gradients["dWaa"]
+        v["dWax"] = beta1*v["dWax"] + (1-beta1)*gradients["dWax"]
+        v["dWya"] = beta1*v["dWya"] + (1-beta1)*gradients["dWya"]
+        v["dba"] = beta1*v["dba"] + (1-beta1)*gradients["dba"]
+        v["dby"] = beta1*v["dby"] + (1-beta1)*gradients["dby"]
+
+        v_corrected["dWaa"] = v["dWaa"]/(1-beta1**t)
+        v_corrected["dWax"] = v["dWax"]/(1-beta1**t)
+        v_corrected["dWya"] = v["dWya"]/(1-beta1**t)
+        v_corrected["dba"] = v["dba"]/(1-beta1**t)
+        v_corrected["dby"] = v["dby"]/(1-beta1**t)
+
+        #update s
+        s["dWaa"] = beta2*s["dWaa"] + (1-beta2)*(gradients["dWaa"]**2)
+        s["dWax"] = beta2*s["dWax"] + (1-beta2)*(gradients["dWax"]**2)
+        s["dWya"] = beta2*s["dWya"] + (1-beta2)*(gradients["dWya"]**2)
+        s["dba"] = beta2*s["dba"] + (1-beta2)*(gradients["dba"]**2)
+        s["dby"] = beta2*s["dby"] + (1-beta2)*(gradients["dby"]**2)
+
+        s_corrected["dWaa"] = s["dWaa"]/(1-beta2**t)
+        s_corrected["dWax"] = s["dWax"]/(1-beta2**t)
+        s_corrected["dWya"] = s["dWya"]/(1-beta2**t)
+        s_corrected["dba"] = s["dba"]/(1-beta2**t)
+        s_corrected["dby"] = s["dby"]/(1-beta2**t)
+
+        #Update parameters
+        parameters["Waa"] -= learning_rate*(v_corrected["dWaa"])/(np.sqrt(s_corrected["dWaa"]+eplison))
+        parameters["Wax"] -= learning_rate*(v_corrected["dWax"])/(np.sqrt(s_corrected["dWax"]+eplison))
+        parameters["Wya"] -= learning_rate*(v_corrected["dWya"])/(np.sqrt(s_corrected["dWya"]+eplison))
+        parameters["ba"] -= learning_rate*(v_corrected["dba"])/(np.sqrt(s_corrected["dba"]+eplison))
+        parameters["by"] -= learning_rate*(v_corrected["dby"])/(np.sqrt(s_corrected["dby"]+eplison))
+
+
+        return parameters,v,s                
+        
+
+        
+
     def gradient_clip(self,gradients,max_val=5):
 
 
@@ -95,6 +177,7 @@ class MS_Model_RNN:
         gradients = {"dWaa": dWaa, "dWax": dWax, "dWya": dWya, "dba": dba, "dby": dby}
     
         return gradients
+
 
     def update_parameters(self,gradients,parameters,learning_rate = 0.01):
 
@@ -316,7 +399,7 @@ class MS_Model_RNN:
         return gradients
 
 
-    def optimize(self,parameters,a0,X,Y,learning_rate=0.01):
+    def optimize(self,parameters,a0,X,Y,v,s,t,learning_rate,beta1,beta2,eplison):
 
         #forward propagation
         a,y_pred,caches,loss = self.rnn_forward(X,Y,a0,parameters)
@@ -327,13 +410,17 @@ class MS_Model_RNN:
         #gradients clip
         gradients = self.gradient_clip(gradients,max_val=self.maxValue)
 
+        
         #update parameter
+        """
         parameters = self.update_parameters(gradients,parameters,learning_rate)
+        """
+        parametres,v,s =self.update_parameters_with_Adam(gradients,parameters,v,s,t,learning_rate,beta1,beta2,eplison)
+        
+        return parameters,loss,a[-1],v,s
 
-        return parameters,loss,a[-1]
 
-
-    def model(self,X,Y,learning_rate=0.01,num_iterations = 250,print_cost= False):
+    def model(self,X,Y,num_iterations = 250,learning_rate=0.01,beta1=0.9,beta2=0.999,eplison=1e-8,print_cost= False):
 
         parameters = self.initial_parameters(self.n_a,self.n_x,self.n_y)
 
@@ -341,9 +428,11 @@ class MS_Model_RNN:
 
         loss = 0
 
+        v,s = self.initialize_Adam(parameters)
+
         for i in range(num_iterations):
 
-            parameters,curr_loss,a_prev = self.optimize(parameters,a_prev,X,Y,learning_rate=learning_rate)
+            parameters,curr_loss,a_prev,v,s = self.optimize(parameters,a_prev,X,Y,v,s,i+1,learning_rate,beta1,beta2,eplison)
 
             loss = (loss*0.999 + curr_loss*0.001)/Y.shape[0]
 

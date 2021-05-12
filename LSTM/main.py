@@ -51,6 +51,13 @@ print("Y first row: ",obj.Train_Y[0])
 print("X last row: ",obj.Train_X[-1])
 print("Y last row: ",obj.Train_Y[-1])
 
+np.random.seed(1)
 parameters = obj.initialize_parameters(obj.n_a,obj.n_x,obj.n_y)
 
+X = np.random.randn(10,obj.n_x)
+Y = np.random.randn(9,obj.n_y)
+a0 = np.random.randn(obj.n_a,1)
+c0 = np.random.randn(obj.n_a,1)
+
+a,c,cahce,loss = obj.LSTM_forward(X,Y,a0,c0,parameters)
 

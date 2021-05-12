@@ -46,6 +46,14 @@ class MS_Model_LSTM:
 
         return np.maximum(z,0)
 
+    def gradient_clip(self,gradients,maxValue):
+
+        for grad in gradients.values():
+
+            np.clip(a=grad,a_min=-maxValue,a_max=maxValue,out=grad)
+
+        return gradients
+
     def initialize_parameters(self,n_a,n_x,n_y):
 
         """
@@ -80,7 +88,7 @@ class MS_Model_LSTM:
         y_hat:
 
         Wya: (n_y,n_a)
-        by: (n_a,1)
+        by: (n_y,1)
         
         """
 
@@ -105,7 +113,7 @@ class MS_Model_LSTM:
         parameters["bo"] = np.zeros((n_a,1))
 
         parameters["Wya"] = np.random.randn(n_y,n_a)
-        parameters["by"] = np.zeros((n_a,1))
+        parameters["by"] = np.zeros((n_y,1))
 
         return parameters
 
@@ -129,7 +137,7 @@ class MS_Model_LSTM:
         bu = parameters["bu"]
 
         Wfa = parameters["Wfa"]
-        Wfx = paramteres["Wfx"]
+        Wfx = parameters["Wfx"]
         Wfc = parameters["Wfc"]
         bf = parameters["bf"]
 
@@ -171,6 +179,51 @@ class MS_Model_LSTM:
 
         return a_t,c_t,y_hat,cache
 
+
+    def LSTM_forward(self,X,Y,a0,c0,parameters):
+
+        """
+        X : (T_x,n_x)
+        Y : (T,n_y)
+        a0: (n_a,1)
+
+        """
+
+        #Get Shape
+        T_x,n_x = X.shape
+        T,n_y = Y.shape
+
+        #Set up caches
+        caches = []
+        a = []
+        c = []
+
+        #initialize variable
+        loss = 0
+        a_next = a0.copy()
+        c_next = c0.copy()
+
+        for t in range(1,T):
+
+            #Get One Step data X input
+            x_t = X[t-1,:].reshape(n_x,1)
+
+            #Forward One Step
+            a_next,c_next,y_hat,cache_t = self.LSTM_step_forward(c_next,a_next,x_t,parameters)
+
+            #Save Cell and hidden state
+            a.append(a_next)
+            c.append(c_next)
+
+            #Update loss
+            y_t = Y[t,:].reshape(n_y,1)
+            loss = loss + np.sum(- y_t*np.log(y_hat)-(1-y_t)*np.log(1-y_hat))
+
+            #Save Cache
+            caches.append(cache_t)
+
+
+        return a,c,caches,loss
         
 
         

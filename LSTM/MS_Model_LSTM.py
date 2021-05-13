@@ -46,6 +46,30 @@ class MS_Model_LSTM:
 
         return np.maximum(z,0)
 
+    def activation_derivative(self,z,activation="tanh"):
+
+        if activation == "tanh":
+
+            return (1-((np.tanh(z))**2))
+
+        elif activation == "relu":
+
+            drelu = np.zeros(z.shape)
+            drelu[z>=0] = 1
+
+            return drelu
+        
+        elif activation == "sigmoid":
+
+            g = self.sigmoid(z)
+            
+            return g*(1-g)
+
+        else:
+
+            print("Invalid Activation")
+            
+
     def gradient_clip(self,gradients,maxValue):
 
         for grad in gradients.values():
@@ -53,6 +77,7 @@ class MS_Model_LSTM:
             np.clip(a=grad,a_min=-maxValue,a_max=maxValue,out=grad)
 
         return gradients
+    
 
     def initialize_parameters(self,n_a,n_x,n_y):
 
@@ -118,12 +143,13 @@ class MS_Model_LSTM:
         return parameters
 
 
-    def LSTM_step_forward(self,c_prev,a_prev,x_t,parameters):
+    def LSTM_step_forward(self,c_prev,a_prev,x_t,y_t,parameters):
 
         """
         c_prev : (n_a,1)
         a_prev : (n_a,1)
         x_t: (n_x,1)
+        y_t: (n_y,1)
 
         """
 
@@ -175,7 +201,7 @@ class MS_Model_LSTM:
         z = np.dot(Wya,a_t)+by
         y_hat = self.sigmoid(z)
 
-        cache = (y_hat,a_t,c_t,Gamma_o,Gamma_f,Gamma_u,c_st)
+        cache = (y_hat,a_t,c_t,x_t,y_t,a_prev,c_prev,Gamma_o,Gamma_f,Gamma_u,c_st)
 
         return a_t,c_t,y_hat,cache
 
@@ -203,20 +229,20 @@ class MS_Model_LSTM:
         a_next = a0.copy()
         c_next = c0.copy()
 
-        for t in range(1,T):
+        for t in range(T):
 
             #Get One Step data X input
-            x_t = X[t-1,:].reshape(n_x,1)
-
+            x_t = X[t,:].reshape(n_x,1)
+            y_t = Y[t,:].reshape(n_y,1)
+            
             #Forward One Step
-            a_next,c_next,y_hat,cache_t = self.LSTM_step_forward(c_next,a_next,x_t,parameters)
+            a_next,c_next,y_hat,cache_t = self.LSTM_step_forward(c_next,a_next,x_t,y_t,parameters)
 
             #Save Cell and hidden state
             a.append(a_next)
             c.append(c_next)
 
             #Update loss
-            y_t = Y[t,:].reshape(n_y,1)
             loss = loss + np.sum(- y_t*np.log(y_hat)-(1-y_t)*np.log(1-y_hat))
 
             #Save Cache
@@ -224,12 +250,112 @@ class MS_Model_LSTM:
 
 
         return a,c,caches,loss
+
+    def LSTM_step_backward(self,da_next,dc_next,cache_t,parameters,gradients):
+        
+        """
+        cahce_t : (y_hat,a_t,c_t,x_t,y_t,a_prev,c_prev,Gamma_o,Gamma_f,Gamma_u,c_st)
+        """
+        
+        y_hat,a_t,c_t,x_t,y_t,a_prev,c_prev,Gamma_o,Gamma_f,Gamma_u,c_st = cache_t
+
+        Woa = parameters["Woa"]
+        Wfa = parameters["Wfa"]
+        Wua = parameters["Wua"]
+        Wca = parameters["Wca"]
+        Wya = parameters["Wya"]
+
+        dZy = y_hat - y_t
+        da_t = da_next + np.dot(Wya.T,dZy)
+
+        dc_t = dc_next + da_t*Gamma_o*(1-((np.tanh(c_t))**2))
+        dZf = dc_t*c_prev*Gamma_f*(1-Gamma_f)
+        dZu = dc_t*c_st*Gamma_u*(1-Gamma_u)
+        dZc = dc_t*Gamma_u*(1-((c_st)**2))
+        dZo = da_t*np.tanh(c_t)*Gamma_o*(1-Gamma_o)
+
+        gradients["dWya"] += np.dot(dZy,a_t.T)
+        gradients["dby"] += dZy
+
+        gradients["dWoa"] += np.dot(dZo,a_prev.T)
+        gradients["dWox"] += np.dot(dZo,x_t.T)
+        gradients["dbo"] += dZo
+
+        gradients["dWca"] += np.dot(dZc,a_prev.T)
+        gradients["dWcx"] += np.dot(dZc,x_t.T)
+        gradients["dbc"] += dZc
+
+        gradients["dWfa"] += np.dot(dZf,a_prev.T)
+        gradients["dWfx"] += np.dot(dZf,x_t.T)
+        gradients["dWfc"] += np.dot(dZf,c_prev.T)
+        gradients["dbf"] += dZf
+
+        gradients["dWua"] += np.dot(dZu,a_prev.T)
+        gradients["dWux"] += np.dot(dZu,x_t.T)
+        gradients["dWuc"] += np.dot(dZu,c_prev.T)
+        gradients["dbu"] += dZu
+
+
+        da_prev = np.dot(Woa.T,dZo)+np.dot(Wfa.T,dZf)+np.dot(Wua.T,dZu)+np.dot(Wca.T,dZc)
+        dc_prev = dc_t*Gamma_f+np.dot(Wfc.T,dZf)+np.dot(Wuc.T,dZu)
+
+        return gradients,da_prev,dc_prev
+
+
+    def LSTM_backward(self,gradients,parameters,cache,regularization_factor=0.1):
+
+        """
+        cache:
+        cache1
+        cache2
+        .
+        .
+        .
+        
+        """
+
+        n_a,n_x = parameters["Wux"].shape
+        T = len(cache)
+
+        da_next = np.zeros((n_a,1))
+        dc_next = np.zeros((n_a,1))
+
+        for t in reversed(range(T)):
+
+            #Get Cache_t
+            cache_t = cache[t]
+
+            #Backward 1 step
+            gradients,da_next,dc_next = self.LSTM_step_backward(da_next,dc_next,cache_t,parameters,gradients)
+
+
+        #regularization
+        
+        gradients["dWya"] = gradients["dWya"]/T + regularization_factor*parameters["Wya"]
+
+        gradients["dWoa"] = gradients["dWoa"]/T + regularization_factor*parameters["Woa"]
+        gradients["dWox"] = gradients["dWox"]/T + regularization_factor*parameters["Wox"]
+
+        gradients["dWca"] = gradients["dWca"]/T + regularization_factor*parameters["Wca"]
+        gradients["dWcx"] = gradients["dWcx"]/T + regularization_factor*parameters["Wcx"]
+
+        gradients["dWfa"] = gradients["dWfa"]/T + regularization_factor*parameters["Wfa"]
+        gradients["dWfx"] = gradients["dWfx"]/T + regularization_factor*parameters["Wfx"]
+        gradients["dWfc"] = gradients["dWfc"]/T + regularization_factor*parameters["Wfc"]
+
+        gradients["dWua"] = gradients["dWua"]/T + regularization_factor*parameters["Wua"]
+        gradients["dWux"] = gradients["dWux"]/T + regularization_factor*parameters["Wux"]
+        gradients["dWuc"] = gradients["dWuc"]/T + regularization_factor*parameters["Wuc"]
+
+
+        return gradients
+
+
+
         
 
         
         
-
-
 
 
 

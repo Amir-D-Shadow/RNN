@@ -22,9 +22,9 @@ gradients = {"dWya":dWya,"dWaa":dWaa,"dWax":dWax,"dba":dba,"dby":dby}
 new_grad = obj.gradient_clip(gradients,max_val=0.0001)
 """
 
-"""
+
 #Test RNN
-obj = MS_Model_RNN.MS_Model_RNN(n_a=32,max_val = 0.5)
+obj = MS_Model_RNN.MS_Model_RNN(n_a=128,max_val = 0.5)
 obj.load_data()
 parameters ,a = obj.model(obj.Train_Data_X,obj.Train_Data_Y,num_iterations =101,print_cost=True)
 
@@ -61,3 +61,4 @@ c0 = np.random.randn(obj.n_a,1)
 
 a,c,cahce,loss = obj.LSTM_forward(X,Y,a0,c0,parameters)
 
+"""

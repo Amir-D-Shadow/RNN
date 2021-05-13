@@ -342,7 +342,7 @@ class MS_Model_RNN:
         gradients["dWaa"] += np.dot((da_t*self.relu_derivative(z)),a_prevt.T)
         gradients["dba"] += da_t*self.relu_derivative(z)
 
-        da_prevt = np.dot(Waa,(da_t*self.relu_derivative(z)))
+        da_prevt = np.dot(Waa.T,(da_t*self.relu_derivative(z)))
 
         
         
@@ -386,7 +386,7 @@ class MS_Model_RNN:
         #Time Step
         t = 0
 
-        for i in reversed(range(Ty)):
+        for i in range(Ty):
 
             #Retrieve cache
             y_t = Y[i,:].copy().reshape(n_y,1)
@@ -420,7 +420,7 @@ class MS_Model_RNN:
         return parameters,loss,a[-1],v,s
 
 
-    def model(self,X,Y,num_iterations = 250,learning_rate=0.01,beta1=0.9,beta2=0.999,eplison=1e-8,print_cost= False):
+    def model(self,X,Y,num_iterations = 250,learning_rate=0.001,beta1=0.9,beta2=0.999,eplison=1e-8,print_cost= False):
 
         parameters = self.initial_parameters(self.n_a,self.n_x,self.n_y)
 

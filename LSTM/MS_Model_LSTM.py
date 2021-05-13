@@ -36,11 +36,58 @@ class MS_Model_LSTM:
 
         self.Train_X = np.squeeze(np.array(res))
         self.Train_Y = self.Train_X[1:].copy()
+
+    def initialize_Adam(self,gradients):
+
+        #Set up
+        v = {}
+        s = {}
+
+        for grad in gradients.keys():
+
+            v[grad] = np.zeros_like(gradients[grad])
+            s[grad] = np.zeros_like(gradients[grad])
+
+        return v,s
+
+    def update_parameters_with_Adam(self,gradients,parameters,v,s,i,beta1=0.9,beta2=0.999,eplison=1e-8,learning_rate=0.001):
+
+        """
+        Adam update parameters per ITERATIONS!!!
+        
+        ***Important: v,s and v_corrected,s_corrected should be treated separately
+
+        """
+
+        #Important: v,s and v_corrected,s_corrected should be treated separately
+
+        #Set up
+        v_corrected = {}
+        s_corrected = {}
+
+        #Update parameters
+        for para in parameters:
+
+            grad = "d" + para
+
+            #Update v
+            v[grad] = beta1*v[grad]+(1-beta1)*gradients[grad]
+            v_corrected[grad] = v[grad]/(1-beta1**i)
+
+            #update s
+            s[grad] = beta2*s[grad]+(1-beta2)*((gradients[grad])**2)
+            s_corrected[grad] = s[grad]/(1-beta2**i)
+
+            #update parameters
+            parameters[para] -= learning_rate*(v_corrected[grad]/np.sqrt(s_corrected[grad]+eplison))
+            
+
+        return parameters,v,s
         
 
     def sigmoid(self,z):
 
-        return np.where(z>=0,(1/(1+np.exp(-z))),(np.exp(z)/(1+np.exp(z))))
+        return np.where(z>=0,(1/(1+np.exp(-z))),(np.exp(z)/(1 + np.exp(z))))
 
     def relu(self,z):
 
@@ -259,11 +306,18 @@ class MS_Model_LSTM:
         
         y_hat,a_t,c_t,x_t,y_t,a_prev,c_prev,Gamma_o,Gamma_f,Gamma_u,c_st = cache_t
 
-        Woa = parameters["Woa"]
-        Wfa = parameters["Wfa"]
-        Wua = parameters["Wua"]
         Wca = parameters["Wca"]
+        Wcx = parameters["Wcx"]
+        Wua = parameters["Wua"]
+        Wux = parameters["Wux"]
+        Wuc = parameters["Wuc"]
+        Wfa = parameters["Wfa"]
+        Wfx = parameters["Wfx"]
+        Wfc = parameters["Wfc"]
+        Woa = parameters["Woa"]
+        Wox = parameters["Wox"]
         Wya = parameters["Wya"]
+
 
         dZy = y_hat - y_t
         da_t = da_next + np.dot(Wya.T,dZy)
@@ -302,7 +356,7 @@ class MS_Model_LSTM:
         return gradients,da_prev,dc_prev
 
 
-    def LSTM_backward(self,gradients,parameters,cache,regularization_factor=0.1):
+    def LSTM_backward(self,parameters,caches,regularization_factor=0.1):
 
         """
         cache:
@@ -312,10 +366,66 @@ class MS_Model_LSTM:
         .
         .
         
+        c_st:
+        
+        Wca : (n_a,n_a)
+        Wcx : (n_a,n_x)
+        bc : (n_a,1)
+
+        Gamma_u:
+
+        Wua : (n_a,n_a)
+        Wux : (n_a,n_x)
+        Wuc : (n_a,n_a)
+        bu : (n_a,1)
+
+        Gamma_f:
+
+        Wfa : (n_a,n_a)
+        Wfx : (n_a,n_x)
+        Wfc : (n_a,n_a)
+        bf : (n_a,1)
+
+        Gamma_o:
+
+        Woa : (n_a,n_a)
+        Wox : (n_a,n_x)
+        bo : (n_a,1)
+
+        y_hat:
+
+        Wya: (n_y,n_a)
+        by: (n_y,1)
         """
 
+        n_a,n_x,n_y = self.n_a,self.n_x,self.n_y
+        gradients = {}
+
+        #Set up
+        gradients["dWya"] = np.zeros((n_y,n_a))
+        gradients["dby"] = np.zeros((n_y,1))
+
+        gradients["dWoa"] = np.zeros((n_a,n_a))
+        gradients["dWox"] = np.zeros((n_a,n_x))
+        gradients["dbo"] = np.zeros((n_a,1))
+
+        gradients["dWca"] = np.zeros((n_a,n_a))
+        gradients["dWcx"] = np.zeros((n_a,n_x))
+        gradients["dbc"] = np.zeros((n_a,1))
+
+        gradients["dWfa"] = np.zeros((n_a,n_a))
+        gradients["dWfx"] = np.zeros((n_a,n_x))
+        gradients["dWfc"] = np.zeros((n_a,n_a))
+        gradients["dbf"] = np.zeros((n_a,1))
+
+        gradients["dWua"] = np.zeros((n_a,n_a))
+        gradients["dWux"] = np.zeros((n_a,n_x))
+        gradients["dWuc"] = np.zeros((n_a,n_a))
+        gradients["dbu"] = np.zeros((n_a,1))
+
+        #get shape
         n_a,n_x = parameters["Wux"].shape
-        T = len(cache)
+        T = len(caches)
 
         da_next = np.zeros((n_a,1))
         dc_next = np.zeros((n_a,1))
@@ -323,7 +433,7 @@ class MS_Model_LSTM:
         for t in reversed(range(T)):
 
             #Get Cache_t
-            cache_t = cache[t]
+            cache_t = caches[t]
 
             #Backward 1 step
             gradients,da_next,dc_next = self.LSTM_step_backward(da_next,dc_next,cache_t,parameters,gradients)
@@ -351,10 +461,83 @@ class MS_Model_LSTM:
         return gradients
 
 
+    def optimize(self,X,Y,a0,c0,parameters,v,s,i,regularization_factor=1,beta1=0.9,beta2=0.999,eplison=1e-8,learning_rate=0.001):
+
+        #Get shape
+        T_x,n_x = X.shape
+        T,n_y = Y.shape
+
+        #Forward Propogation
+        a,c,caches,loss = self.LSTM_forward(X,Y,a0,c0,parameters)
+
+        #Backward Propogation
+        gradients = self.LSTM_backward(parameters,caches,regularization_factor)
+
+        #gradient clipping
+        gradients = self.gradient_clip(gradients,self.maxValue)
+
+        #Update parameters
+        parameters,v,s = self.update_parameters_with_Adam(gradients,parameters,v,s,i,beta1,beta2,eplison,learning_rate)
 
         
+        return parameters,loss,a[-1],c[-1],v,s
+
+    def model(self,X,Y,iterations = 151,learning_rate=0.001,regularization_factor=0.1,beta1=0.9,beta2=0.999,eplison=1e-8,print_cost=False):
+
+        parameters = self.initialize_parameters(self.n_a,self.n_x,self.n_y)
+
+        a0 = np.random.randn(self.n_a,1)
+        c0 = np.random.randn(self.n_a,1)
+        T = Y.shape[0]
+
+        loss = 0
+        gradients = {}
+
+        #Set up
+        n_a,n_y,n_x = self.n_a,self.n_y,self.n_x
+        gradients["dWya"] = np.zeros((n_y,n_a))
+        gradients["dby"] = np.zeros((n_y,1))
+
+        gradients["dWoa"] = np.zeros((n_a,n_a))
+        gradients["dWox"] = np.zeros((n_a,n_x))
+        gradients["dbo"] = np.zeros((n_a,1))
+
+        gradients["dWca"] = np.zeros((n_a,n_a))
+        gradients["dWcx"] = np.zeros((n_a,n_x))
+        gradients["dbc"] = np.zeros((n_a,1))
+
+        gradients["dWfa"] = np.zeros((n_a,n_a))
+        gradients["dWfx"] = np.zeros((n_a,n_x))
+        gradients["dWfc"] = np.zeros((n_a,n_a))
+        gradients["dbf"] = np.zeros((n_a,1))
+
+        gradients["dWua"] = np.zeros((n_a,n_a))
+        gradients["dWux"] = np.zeros((n_a,n_x))
+        gradients["dWuc"] = np.zeros((n_a,n_a))
+        gradients["dbu"] = np.zeros((n_a,1))
+        
+        v,s = self.initialize_Adam(gradients)
 
         
+        for i in range(iterations):
+
+            parameters,curr_loss,a0,c0,v,s = self.optimize(X,Y,a0,c0,parameters,v,s,i+1,regularization_factor,beta1,beta2,eplison,learning_rate)
+
+            #update loss
+            curr_loss = np.sum(curr_loss)
+            for para in parameters.values():
+
+                curr_loss = curr_loss #+ regularization_factor*(np.sum(para)**2)/2
+
+            loss = curr_loss/T
+
+
+            if print_cost and (i%50) == 0:
+
+                print("Loss :",loss)
+
+
+        return parameters,a0,c0
         
 
 

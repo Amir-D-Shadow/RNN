@@ -24,9 +24,9 @@ new_grad = obj.gradient_clip(gradients,max_val=0.0001)
 
 """
 #Test RNN
-obj = MS_Model_RNN.MS_Model_RNN(n_a=1090,max_val = 0.5)
+obj = MS_Model_RNN.MS_Model_RNN(n_a=128,max_val = 0.5)
 obj.load_data()
-parameters ,a = obj.model(obj.Train_Data_X,obj.Train_Data_Y,num_iterations =151,print_cost=True)
+parameters ,a = obj.model(obj.Train_Data_X,obj.Train_Data_Y,num_iterations =101,print_cost=True)
 
 Waa = parameters["Waa"]
 Wax = parameters["Wax"]
@@ -41,10 +41,9 @@ result_list = y_hat.flatten().tolist()
 res = np.array(result_list).argsort()[-7:]
 
 """
-
-obj = MS_Model_LSTM.MS_Model_LSTM(n_a = 32,max_val = 0.001)
+"""
+obj = MS_Model_LSTM.MS_Model_LSTM(max_val = 0.1)
 obj.load_data()
-
 
 print("X_shape: ",obj.Train_X.shape," ","Y_shape: ",obj.Train_Y.shape)
 print("X first row: ",obj.Train_X[0])
@@ -63,6 +62,31 @@ c0 = np.random.randn(obj.n_a,1)
 a,c,cahce,loss = obj.LSTM_forward(X,Y,a0,c0,parameters)
 """
 
-parameters,a0,c0 = obj.model(obj.Train_X,obj.Train_Y,iterations=151,learning_rate = 0.0001,print_cost = True)
-
 """
+#With peephole connection LSTM
+obj = MS_Model_LSTM.MS_Model_LSTM(n_a=176,max_val = 0.01)
+obj.load_data()
+
+parameters,a0,c0 = obj.model(obj.Train_X,obj.Train_Y,iterations = 1951,learning_rate=0.055,regularization_factor=0.1,beta1=0.9,beta2=0.999,eplison=1e-8,print_cost=True)
+Wya = parameters["Wya"]
+by = parameters["by"]
+
+z = np.dot(Wya,a0)+by
+y_hat= obj.sigmoid(z)
+
+result_list = y_hat.flatten().tolist()
+res = np.array(result_list).argsort()[-7:]
+"""
+obj = MS_Model_LSTM.MS_Model_LSTM(n_a=138,max_val = 0.01)
+obj.load_data()
+
+parameters,a0,c0 = obj.model(obj.Train_X,obj.Train_Y,iterations = 351,learning_rate=0.055,regularization_factor=0.1,beta1=0.9,beta2=0.999,eplison=1e-8,print_cost=True)
+Wya = parameters["Wya"]
+by = parameters["by"]
+
+z = np.dot(Wya,a0)+by
+y_hat= obj.sigmoid(z)
+
+result_list = y_hat.flatten().tolist()
+res = np.array(result_list).argsort()[-7:]
+

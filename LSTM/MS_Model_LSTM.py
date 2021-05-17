@@ -36,53 +36,6 @@ class MS_Model_LSTM:
 
         self.Train_X = np.squeeze(np.array(res))
         self.Train_Y = self.Train_X[1:].copy()
-
-    def initialize_Adam(self,gradients):
-
-        #Set up
-        v = {}
-        s = {}
-
-        for grad in gradients.keys():
-
-            v[grad] = np.zeros_like(gradients[grad])
-            s[grad] = np.zeros_like(gradients[grad])
-
-        return v,s
-
-    def update_parameters_with_Adam(self,gradients,parameters,v,s,i,beta1=0.9,beta2=0.999,eplison=1e-8,learning_rate=0.001):
-
-        """
-        Adam update parameters per ITERATIONS!!!
-        
-        ***Important: v,s and v_corrected,s_corrected should be treated separately
-
-        """
-
-        #Important: v,s and v_corrected,s_corrected should be treated separately
-
-        #Set up
-        v_corrected = {}
-        s_corrected = {}
-
-        #Update parameters
-        for para in parameters:
-
-            grad = "d" + para
-
-            #Update v
-            v[grad] = beta1*v[grad]+(1-beta1)*gradients[grad]
-            v_corrected[grad] = v[grad]/(1-beta1**i)
-
-            #update s
-            s[grad] = beta2*s[grad]+(1-beta2)*((gradients[grad])**2)
-            s_corrected[grad] = s[grad]/(1-beta2**i)
-
-            #update parameters
-            parameters[para] -= learning_rate*(v_corrected[grad]/np.sqrt(s_corrected[grad]+eplison))
-            
-
-        return parameters,v,s
         
 
     def sigmoid(self,z):
@@ -115,6 +68,53 @@ class MS_Model_LSTM:
         else:
 
             print("Invalid Activation")
+
+    def initialize_Adam(self,gradients):
+
+        #Set up
+        v = {}
+        s = {}
+
+        for grad in gradients.keys():
+
+            v[grad] = np.zeros_like(gradients[grad])
+            s[grad] = np.zeros_like(gradients[grad])
+
+        return v,s
+
+    def update_parameters_with_Adam(self,gradients,parameters,v,s,i,beta1=0.9,beta2=0.999,eplison=1e-8,learning_rate=0.001):
+
+        """
+        Adam update parameters per ITERATIONS!!!
+        
+        ***Important: v,s and v_corrected,s_corrected should be treated separately
+        """
+
+        #Important: v,s and v_corrected,s_corrected should be treated separately
+
+        #Set up
+        v_corrected = {}
+        s_corrected = {}
+
+        #Update parameters
+        for para in parameters:
+
+            grad = "d" + para
+
+            #Update v
+            v[grad] = beta1*v[grad]+(1-beta1)*gradients[grad]
+            v_corrected[grad] = v[grad]/(1-beta1**i)
+
+            #update s
+            s[grad] = beta2*s[grad]+(1-beta2)*((gradients[grad])**2)
+            s_corrected[grad] = s[grad]/(1-beta2**i)
+
+            #update parameters
+            parameters[para] -= learning_rate*(v_corrected[grad]/np.sqrt(s_corrected[grad]+eplison))
+            
+
+        return parameters,v,s
+        
             
 
     def gradient_clip(self,gradients,maxValue):
@@ -126,7 +126,7 @@ class MS_Model_LSTM:
         return gradients
     
 
-    def initialize_parameters(self,n_a,n_x,n_y):
+    def initialize_parameters(self,n_a=128,n_x=49,n_y=49):
 
         """
         Parameters includes:
@@ -228,15 +228,18 @@ class MS_Model_LSTM:
 
         #Update Gate
         z = np.dot(Wua,a_prev)+np.dot(Wux,x_t)+np.dot(Wuc,c_prev)+bu
-        Gamma_u = self.sigmoid(z)
+        #print("Update Gate: ",np.sum(z))
+        Gamma_u = self.sigmoid(np.where(z>=0,np.minimum(z,1e2),np.maximum(z,-1e2)))
 
         #Forget Gate
         z = np.dot(Wfa,a_prev)+np.dot(Wfx,x_t)+np.dot(Wfc,c_prev)+bf
-        Gamma_f = self.sigmoid(z)
+        #print("Forget Gate: ",np.sum(z))
+        Gamma_f = self.sigmoid(np.where(z>=0,np.minimum(z,1e2),np.maximum(z,-1e2)))
 
         #Output Gate
         z = np.dot(Woa,a_prev)+np.dot(Wox,x_t)+bo
-        Gamma_o = self.sigmoid(z)
+        #print("Output Gate: ",np.sum(z))
+        Gamma_o = self.sigmoid(np.where(z>=0,np.minimum(z,1e2),np.maximum(z,-1e2)))
 
         #Cells state t
         c_t = Gamma_u*c_st+Gamma_f*c_prev
@@ -246,7 +249,8 @@ class MS_Model_LSTM:
 
         #y_hat prediction
         z = np.dot(Wya,a_t)+by
-        y_hat = self.sigmoid(z)
+        #print("y_hat: ",np.sum(z))
+        y_hat = self.sigmoid(np.where(z>=0,np.minimum(z,1e2),np.maximum(z,-1e2)))
 
         cache = (y_hat,a_t,c_t,x_t,y_t,a_prev,c_prev,Gamma_o,Gamma_f,Gamma_u,c_st)
 
@@ -306,23 +310,19 @@ class MS_Model_LSTM:
         
         y_hat,a_t,c_t,x_t,y_t,a_prev,c_prev,Gamma_o,Gamma_f,Gamma_u,c_st = cache_t
 
-        Wca = parameters["Wca"]
-        Wcx = parameters["Wcx"]
-        Wua = parameters["Wua"]
-        Wux = parameters["Wux"]
-        Wuc = parameters["Wuc"]
-        Wfa = parameters["Wfa"]
-        Wfx = parameters["Wfx"]
-        Wfc = parameters["Wfc"]
         Woa = parameters["Woa"]
-        Wox = parameters["Wox"]
+        Wfa = parameters["Wfa"]
+        Wfc = parameters["Wfc"]
+        Wua = parameters["Wua"]
+        Wuc = parameters["Wuc"]
+        Wca = parameters["Wca"]
         Wya = parameters["Wya"]
-
 
         dZy = y_hat - y_t
         da_t = da_next + np.dot(Wya.T,dZy)
-
+        
         dc_t = dc_next + da_t*Gamma_o*(1-((np.tanh(c_t))**2))
+
         dZf = dc_t*c_prev*Gamma_f*(1-Gamma_f)
         dZu = dc_t*c_st*Gamma_u*(1-Gamma_u)
         dZc = dc_t*Gamma_u*(1-((c_st)**2))
@@ -356,7 +356,7 @@ class MS_Model_LSTM:
         return gradients,da_prev,dc_prev
 
 
-    def LSTM_backward(self,parameters,caches,regularization_factor=0.1):
+    def LSTM_backward(self,parameters,cache,regularization_factor=0.1):
 
         """
         cache:
@@ -366,66 +366,19 @@ class MS_Model_LSTM:
         .
         .
         
-        c_st:
-        
-        Wca : (n_a,n_a)
-        Wcx : (n_a,n_x)
-        bc : (n_a,1)
-
-        Gamma_u:
-
-        Wua : (n_a,n_a)
-        Wux : (n_a,n_x)
-        Wuc : (n_a,n_a)
-        bu : (n_a,1)
-
-        Gamma_f:
-
-        Wfa : (n_a,n_a)
-        Wfx : (n_a,n_x)
-        Wfc : (n_a,n_a)
-        bf : (n_a,1)
-
-        Gamma_o:
-
-        Woa : (n_a,n_a)
-        Wox : (n_a,n_x)
-        bo : (n_a,1)
-
-        y_hat:
-
-        Wya: (n_y,n_a)
-        by: (n_y,1)
         """
 
-        n_a,n_x,n_y = self.n_a,self.n_x,self.n_y
+        #initialize gradient
         gradients = {}
+        
+        for para in parameters.keys():
 
-        #Set up
-        gradients["dWya"] = np.zeros((n_y,n_a))
-        gradients["dby"] = np.zeros((n_y,1))
+            grad = "d" + para
+            gradients[grad] = np.zeros(parameters[para].shape)
 
-        gradients["dWoa"] = np.zeros((n_a,n_a))
-        gradients["dWox"] = np.zeros((n_a,n_x))
-        gradients["dbo"] = np.zeros((n_a,1))
-
-        gradients["dWca"] = np.zeros((n_a,n_a))
-        gradients["dWcx"] = np.zeros((n_a,n_x))
-        gradients["dbc"] = np.zeros((n_a,1))
-
-        gradients["dWfa"] = np.zeros((n_a,n_a))
-        gradients["dWfx"] = np.zeros((n_a,n_x))
-        gradients["dWfc"] = np.zeros((n_a,n_a))
-        gradients["dbf"] = np.zeros((n_a,1))
-
-        gradients["dWua"] = np.zeros((n_a,n_a))
-        gradients["dWux"] = np.zeros((n_a,n_x))
-        gradients["dWuc"] = np.zeros((n_a,n_a))
-        gradients["dbu"] = np.zeros((n_a,1))
-
-        #get shape
+                  
         n_a,n_x = parameters["Wux"].shape
-        T = len(caches)
+        T = len(cache)
 
         da_next = np.zeros((n_a,1))
         dc_next = np.zeros((n_a,1))
@@ -433,7 +386,7 @@ class MS_Model_LSTM:
         for t in reversed(range(T)):
 
             #Get Cache_t
-            cache_t = caches[t]
+            cache_t = cache[t]
 
             #Backward 1 step
             gradients,da_next,dc_next = self.LSTM_step_backward(da_next,dc_next,cache_t,parameters,gradients)
@@ -441,25 +394,24 @@ class MS_Model_LSTM:
 
         #regularization
         
-        gradients["dWya"] = gradients["dWya"]/T + regularization_factor*parameters["Wya"]
+        gradients["dWya"] = (gradients["dWya"]+regularization_factor*parameters["Wya"])/T
 
-        gradients["dWoa"] = gradients["dWoa"]/T + regularization_factor*parameters["Woa"]
-        gradients["dWox"] = gradients["dWox"]/T + regularization_factor*parameters["Wox"]
+        gradients["dWoa"] = (gradients["dWoa"]+regularization_factor*parameters["Woa"])/T
+        gradients["dWox"] = (gradients["dWox"]+regularization_factor*parameters["Wox"])/T
 
-        gradients["dWca"] = gradients["dWca"]/T + regularization_factor*parameters["Wca"]
-        gradients["dWcx"] = gradients["dWcx"]/T + regularization_factor*parameters["Wcx"]
+        gradients["dWca"] = (gradients["dWca"]+regularization_factor*parameters["Wca"])/T
+        gradients["dWcx"] = (gradients["dWcx"]+regularization_factor*parameters["Wcx"])/T
 
-        gradients["dWfa"] = gradients["dWfa"]/T + regularization_factor*parameters["Wfa"]
-        gradients["dWfx"] = gradients["dWfx"]/T + regularization_factor*parameters["Wfx"]
-        gradients["dWfc"] = gradients["dWfc"]/T + regularization_factor*parameters["Wfc"]
+        gradients["dWfa"] = (gradients["dWfa"]+regularization_factor*parameters["Wfa"])/T
+        gradients["dWfx"] = (gradients["dWfx"]+regularization_factor*parameters["Wfx"])/T
+        gradients["dWfc"] = (gradients["dWfc"]+regularization_factor*parameters["Wfc"])/T
 
-        gradients["dWua"] = gradients["dWua"]/T + regularization_factor*parameters["Wua"]
-        gradients["dWux"] = gradients["dWux"]/T + regularization_factor*parameters["Wux"]
-        gradients["dWuc"] = gradients["dWuc"]/T + regularization_factor*parameters["Wuc"]
+        gradients["dWua"] = (gradients["dWua"]+regularization_factor*parameters["Wua"])/T
+        gradients["dWux"] = (gradients["dWux"]+regularization_factor*parameters["Wux"])/T
+        gradients["dWuc"] = (gradients["dWuc"]+regularization_factor*parameters["Wuc"])/T
 
 
         return gradients
-
 
     def optimize(self,X,Y,a0,c0,parameters,v,s,i,regularization_factor=1,beta1=0.9,beta2=0.999,eplison=1e-8,learning_rate=0.001):
 
@@ -480,9 +432,11 @@ class MS_Model_LSTM:
         parameters,v,s = self.update_parameters_with_Adam(gradients,parameters,v,s,i,beta1,beta2,eplison,learning_rate)
 
         
-        return parameters,loss,a[-1],c[-1],v,s
+        return parameters,loss,a[-1],c[-1],a[0],c[0],v,s
 
-    def model(self,X,Y,iterations = 151,learning_rate=0.001,regularization_factor=0.1,beta1=0.9,beta2=0.999,eplison=1e-8,print_cost=False):
+
+
+    def model(self,X,Y,iterations = 51,learning_rate=0.001,regularization_factor=0.1,beta1=0.9,beta2=0.999,eplison=1e-8,print_cost=False):
 
         parameters = self.initialize_parameters(self.n_a,self.n_x,self.n_y)
 
@@ -521,13 +475,11 @@ class MS_Model_LSTM:
         
         for i in range(iterations):
 
-            parameters,curr_loss,a0,c0,v,s = self.optimize(X,Y,a0,c0,parameters,v,s,i+1,regularization_factor,beta1,beta2,eplison,learning_rate)
+            parameters,curr_loss,a_T,c_T,a0,c0,v,s = self.optimize(X,Y,a0,c0,parameters,v,s,i+1,regularization_factor,beta1,beta2,eplison,learning_rate)
 
             #update loss
             curr_loss = np.sum(curr_loss)
-            for para in parameters.values():
-
-                curr_loss = curr_loss #+ regularization_factor*(np.sum(para)**2)/2
+            
 
             loss = curr_loss/T
 
@@ -536,8 +488,16 @@ class MS_Model_LSTM:
 
                 print("Loss :",loss)
 
+        path = os.getcwd() + "/model/"
 
-        return parameters,a0,c0
+        for para in parameters.keys():
+
+            np.savetxt(path+para,parameters[para],delimiter=",")
+
+        return parameters,a_T,c_T
+
+
+    
         
 
 

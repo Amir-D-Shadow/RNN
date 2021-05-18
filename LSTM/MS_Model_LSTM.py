@@ -487,6 +487,10 @@ class MS_Model_LSTM:
 
             #update loss
             curr_loss = np.sum(curr_loss)
+
+            for para in parameters.keys():
+
+                curr_loss += regularization_factor*(np.sum(parameters[para]**2))/2
             
 
             loss = curr_loss/T

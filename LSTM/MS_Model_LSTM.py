@@ -480,7 +480,7 @@ class MS_Model_LSTM:
         
         v,s = self.initialize_Adam(gradients)
 
-        
+        #Train the model
         for i in range(iterations):
 
             parameters,curr_loss,a_T,c_T,a0,c0,v,s = self.optimize(X,Y,a0,c0,parameters,v,s,i+1,regularization_factor,beta1,beta2,eplison,learning_rate)
@@ -496,6 +496,8 @@ class MS_Model_LSTM:
 
                 print("Loss :",loss)
 
+                
+        #Save the model
         path = os.getcwd() + "/model/"
 
         for para in parameters.keys():

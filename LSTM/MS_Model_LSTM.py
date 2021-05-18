@@ -3,12 +3,19 @@ import os
 
 class MS_Model_LSTM:
 
-    def __init__(self,n_a=128,n_x=49,n_y=49,max_val=0.8):
+    def __init__(self,n_a=128,n_x=49,n_y=49,max_val=0.8,iterations = 201,learning_rate=0.055,regularization_factor=1,beta1=0.9,beta2=0.999,eplison=1e-8):
 
         self.n_a = n_a
         self.n_x = n_x
         self.n_y = n_y
         self.maxValue = max_val
+
+        self.iterations = iterations
+        self.learning_rate = learning_rate
+        self.regularization_factor = regularization_factor
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.eplison = eplison
 
         self.Train_X = None
         self.Train_Y = None
@@ -190,7 +197,7 @@ class MS_Model_LSTM:
         return parameters
 
 
-    def LSTM_step_forward(self,c_prev,a_prev,x_t,y_t,parameters):
+    def LSTM_step_forward(self,a_prev,c_prev,x_t,y_t,parameters):
 
         """
         c_prev : (n_a,1)
@@ -287,14 +294,14 @@ class MS_Model_LSTM:
             y_t = Y[t,:].reshape(n_y,1)
             
             #Forward One Step
-            a_next,c_next,y_hat,cache_t = self.LSTM_step_forward(c_next,a_next,x_t,y_t,parameters)
+            a_next,c_next,y_hat,cache_t = self.LSTM_step_forward(a_next,c_next,x_t,y_t,parameters)
 
             #Save Cell and hidden state
             a.append(a_next)
             c.append(c_next)
 
             #Update loss
-            loss = loss + np.sum(- y_t*np.log(y_hat)-(1-y_t)*np.log(1-y_hat))
+            loss = loss + np.sum(- y_t*np.log(y_hat+(1e-12))-(1-y_t)*np.log(1-y_hat+(1e-12)))
 
             #Save Cache
             caches.append(cache_t)
@@ -322,6 +329,7 @@ class MS_Model_LSTM:
         da_t = da_next + np.dot(Wya.T,dZy)
         
         dc_t = dc_next + da_t*Gamma_o*(1-((np.tanh(c_t))**2))
+        #dc_t = np.where(dc_t>=0,np.minimum(dc_t,5e3),np.maximum(dc_t,-5e3))
 
         dZf = dc_t*c_prev*Gamma_f*(1-Gamma_f)
         dZu = dc_t*c_st*Gamma_u*(1-Gamma_u)
@@ -497,7 +505,65 @@ class MS_Model_LSTM:
         return parameters,a_T,c_T
 
 
+    def predict(self,a_prev,c_prev,x_t,parameters):
+        
+
+        Wca = parameters["Wca"]
+        Wcx = parameters["Wcx"]
+        bc = parameters["bc"]
+
+        Wua = parameters["Wua"]
+        Wux = parameters["Wux"]
+        Wuc = parameters["Wuc"]
+        bu = parameters["bu"]
+
+        Wfa = parameters["Wfa"]
+        Wfx = parameters["Wfx"]
+        Wfc = parameters["Wfc"]
+        bf = parameters["bf"]
+
+        Woa = parameters["Woa"]
+        Wox = parameters["Wox"]
+        bo = parameters["bo"]
+
+        Wya = parameters["Wya"]
+        by = parameters["by"]
+
+
+        #~C_t
+        z = np.dot(Wca,a_prev)+np.dot(Wcx,x_t)+bc
+        c_st = np.tanh(z)
+
+        #Update Gate
+        z = np.dot(Wua,a_prev)+np.dot(Wux,x_t)+np.dot(Wuc,c_prev)+bu
+        #print("Update Gate: ",np.sum(z))
+        Gamma_u = self.sigmoid(np.where(z>=0,np.minimum(z,1e2),np.maximum(z,-1e2)))
+
+        #Forget Gate
+        z = np.dot(Wfa,a_prev)+np.dot(Wfx,x_t)+np.dot(Wfc,c_prev)+bf
+        #print("Forget Gate: ",np.sum(z))
+        Gamma_f = self.sigmoid(np.where(z>=0,np.minimum(z,1e2),np.maximum(z,-1e2)))
+
+        #Output Gate
+        z = np.dot(Woa,a_prev)+np.dot(Wox,x_t)+bo
+        #print("Output Gate: ",np.sum(z))
+        Gamma_o = self.sigmoid(np.where(z>=0,np.minimum(z,1e2),np.maximum(z,-1e2)))
+
+        #Cells state t
+        c_t = Gamma_u*c_st+Gamma_f*c_prev
+
+        #Hidden state t
+        a_t = Gamma_o*np.tanh(c_t)
+
+        #y_hat prediction
+        z = np.dot(Wya,a_t)+by
+        #print("y_hat: ",np.sum(z))
+        y_hat = self.sigmoid(np.where(z>=0,np.minimum(z,1e2),np.maximum(z,-1e2)))
+
     
+        res = y_hat.flatten().argsort()[-7:]
+
+        return res
         
 
 

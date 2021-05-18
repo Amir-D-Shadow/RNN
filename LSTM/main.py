@@ -1,5 +1,3 @@
-import MS_Model_LSTM
-import MS_Model_RNN
 import numpy as np
 import os
 
@@ -23,7 +21,9 @@ new_grad = obj.gradient_clip(gradients,max_val=0.0001)
 """
 
 """
-#Test RNN
+#RNN
+import MS_Model_RNN
+
 obj = MS_Model_RNN.MS_Model_RNN(n_a=128,max_val = 0.5)
 obj.load_data()
 parameters ,a = obj.model(obj.Train_Data_X,obj.Train_Data_Y,num_iterations =101,print_cost=True)
@@ -42,6 +42,7 @@ res = np.array(result_list).argsort()[-7:]
 
 """
 """
+#Test
 obj = MS_Model_LSTM.MS_Model_LSTM(max_val = 0.1)
 obj.load_data()
 
@@ -61,12 +62,14 @@ c0 = np.random.randn(obj.n_a,1)
 
 a,c,cahce,loss = obj.LSTM_forward(X,Y,a0,c0,parameters)
 """
-
+"""
 #With peephole connection LSTM
+import MS_Model_LSTM
+
 obj = MS_Model_LSTM.MS_Model_LSTM(n_a=312,max_val = 0.01)
 obj.load_data()
 
-parameters,at,ct = obj.model(obj.Train_X,obj.Train_Y,iterations = 201,learning_rate=0.055,regularization_factor=1.2,beta1=0.9,beta2=0.999,eplison=1e-8,print_cost=True)
+parameters,at,ct = obj.model(obj.Train_X,obj.Train_Y,iterations = 701,learning_rate=0.025,regularization_factor=1,beta1=0.9,beta2=0.999,eplison=1e-8,print_cost=True)
 Wya = parameters["Wya"]
 by = parameters["by"]
 
@@ -77,3 +80,43 @@ res = y_hat.flatten().argsort()[-7:]
 
 x_t = obj.Train_X[-1,:].reshape(obj.n_x,1)
 next_res = obj.predict(at,ct,x_t,parameters)
+"""
+
+"""
+#Without peephole connection LSTM relu
+import MS_Model_LSTM_relu as rnn
+
+obj = rnn.MS_Model_LSTM(n_a=312,max_val=0.01)
+obj.load_data()
+
+parameters,at,ct = obj.model(obj.Train_X,obj.Train_Y,iterations = 501,learning_rate=0.0035,regularization_factor=1,beta1=0.9,beta2=0.999,eplison=1e-8,print_cost=True)
+
+Wya = parameters["Wya"]
+by = parameters["by"]
+
+z = np.dot(Wya,at)+by
+z = np.where(z>=0,np.minimum(z,1e2),np.maximum(z,-1e2))
+y_hat = obj.sigmoid(z)
+
+res = y_hat.flatten().argsort()[-7:]
+"""
+
+"""
+#Without peephole connection LSTM tanh
+import MS_Model_LSTM_tanh as rnn
+
+obj = rnn.MS_Model_LSTM(n_a=256,max_val=0.01)
+obj.load_data()
+
+parameters,at,ct = obj.model(obj.Train_X,obj.Train_Y,iterations = 701,learning_rate=0.0035,regularization_factor=1,beta1=0.9,beta2=0.999,eplison=1e-8,print_cost=True)
+
+Wya = parameters["Wya"]
+by = parameters["by"]
+
+z = np.dot(Wya,at)+by
+z = np.where(z>=0,np.minimum(z,1e2),np.maximum(z,-1e2))
+y_hat = obj.sigmoid(z)
+
+res = y_hat.flatten().argsort()[-7:]
+
+"""

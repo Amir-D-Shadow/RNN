@@ -86,8 +86,8 @@ class MS_Model_LSTM:
 
             grad = "d" + para
 
-            v[grad] = np.zeros_like(gradients[grad])
-            s[grad] = np.zeros_like(gradients[grad])
+            v[grad] = np.zeros_like(parameters[para])
+            s[grad] = np.zeros_like(parameters[para])
 
         return v,s
 

@@ -66,10 +66,10 @@ a,c,cahce,loss = obj.LSTM_forward(X,Y,a0,c0,parameters)
 #With peephole connection LSTM
 import MS_Model_LSTM
 
-obj = MS_Model_LSTM.MS_Model_LSTM(n_a=148,max_val = 0.01)
+obj = MS_Model_LSTM.MS_Model_LSTM(n_a=156,max_val = 0.01)
 obj.load_data()
 
-parameters,at,ct = obj.model(obj.Train_X,obj.Train_Y,iterations = 1001,learning_rate=0.035,regularization_factor=1,beta1=0.99,beta2=0.999,eplison=1e-8,print_cost=True)
+parameters,at,ct = obj.model(obj.Train_X,obj.Train_Y,iterations = 501,learning_rate=0.035,regularization_factor=1,beta1=0.9,beta2=0.999,eplison=1e-8,print_cost=True)
 Wya = parameters["Wya"]
 by = parameters["by"]
 
@@ -81,7 +81,6 @@ res = y_hat.flatten().argsort()[-7:]
 x_t = obj.Train_X[-1,:].reshape(obj.n_x,1)
 next_res = obj.predict(at,ct,x_t,parameters)
 """
-
 """
 #Without peephole connection LSTM relu
 import MS_Model_LSTM_relu as rnn
@@ -120,13 +119,14 @@ y_hat = obj.sigmoid(z)
 res = y_hat.flatten().argsort()[-7:]
 
 """
+
 #With peephole connection LSTM (3 gates)
 import MS_Model_LSTM_ph_3_gate
 
-obj = MS_Model_LSTM_ph_3_gate.MS_Model_LSTM(n_a=158,max_val = 0.01)
+obj = MS_Model_LSTM_ph_3_gate.MS_Model_LSTM(n_a=156,max_val = 0.01)
 obj.load_data()
 
-parameters,at,ct = obj.model(obj.Train_X,obj.Train_Y,iterations = 901,learning_rate=0.035,regularization_factor=1,beta1=0.99,beta2=0.999,eplison=1e-8,print_cost=True)
+parameters,at,ct = obj.model(obj.Train_X,obj.Train_Y,iterations = 3401,learning_rate=0.01,regularization_factor=1,beta1=0.99,beta2=0.9999,eplison=1e-8,print_cost=True)
 Wya = parameters["Wya"]
 by = parameters["by"]
 
@@ -137,3 +137,4 @@ res = y_hat.flatten().argsort()[-7:]
 
 x_t = obj.Train_X[-1,:].reshape(obj.n_x,1)
 next_res = obj.predict(at,ct,x_t,parameters)
+

@@ -88,7 +88,7 @@ class Dense_layer:
 
         for l in range(1,length):
 
-            a_prev,cache_L = self.step_forward(a_prev,self.parameters["W"+str(l)],parameters["b"+str(l)],activation[l-1])
+            a_prev,cache_L = self.step_forward(a_prev,parameters["W"+str(l)],parameters["b"+str(l)],self.activation[l-1])
             
             a.append(a_prev)
             cache.append(cache_L)
@@ -102,16 +102,17 @@ class Dense_layer:
         cache_L: (a_next,a_prev,z,WL,bL)
         """
         a_next,a_prev,z,WL,bL = cache_L
+        m = a_prev.shape[1]
         
         dZ = backward_activation_L(z) * da_next
-        dW = np.dot(dZ,a_prev.T)
-        db = dZ
+        dW = np.dot(dZ,a_prev.T)/m
+        db = np.sum(dZ,axis=1,keepdims=True)/m
         da_prev = np.dot(WL.T,dZ)
 
         return da_prev,dW,db
 
 
-    def back_propagation(self,dAL,cache,parameters):
+    def backward_propagation(self,dAL,cache):
 
         length = len(self.layer_dims)
         da_next = dAL
@@ -122,7 +123,9 @@ class Dense_layer:
 
             grad_W = "dW"+str(l)
             grad_b = "db"+str(l)
-            grad_A = "dA"+str(l)
+            grad_A = "dA"+str(l-1)
+
+            cache_L = cache[l-1]
 
             da_next,dW,db = self.step_backward(da_next,self.backward_activation[l-1],cache_L)
 
@@ -141,7 +144,7 @@ class Dense_layer:
         
 
         #backward propogation
-        gradients = self.back_propagation(dAL,cache,parameters)
+        gradients = self.back_propagation(dAL,cache)
 
         #update parameters
         parameters,v,s = self.update_parameters_with_Adam(parameters,gradients,v,s,L,learning_rate=0.01,beta1=0.9,beta2=0.999,eplison=1e-8)

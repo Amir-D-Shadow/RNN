@@ -452,7 +452,7 @@ class MS_Model_LSTM:
 
 
 
-    def model(self,X,Y,iterations = 51,learning_rate=0.001,regularization_factor=0.1,beta1=0.9,beta2=0.999,eplison=1e-8,print_cost=False):
+    def model(self,X,Y,iterations = 51,loss_threshold=20,learning_rate=0.001,regularization_factor=0.1,beta1=0.9,beta2=0.999,eplison=1e-8,print_cost=False):
 
         a0 = np.random.randn(self.n_a,1)
         c0 = np.random.randn(self.n_a,1)
@@ -484,6 +484,11 @@ class MS_Model_LSTM:
             if print_cost and (i%50) == 0:
 
                 print("Loss :",loss)
+
+            #call back
+            if loss < loss_threshold:
+
+                break
 
                 
         #Save the model

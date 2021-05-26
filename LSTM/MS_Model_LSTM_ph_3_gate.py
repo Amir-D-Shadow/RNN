@@ -560,7 +560,7 @@ class MS_Model_LSTM:
     
         res = y_hat.flatten().argsort()[-7:]
 
-        return res
+        return res,a_t,c_t
         
 
 

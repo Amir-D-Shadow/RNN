@@ -176,26 +176,26 @@ class MS_Model_LSTM:
 
         parameters = {}
 
-        parameters["Wca"] = np.random.randn(n_a,n_a)
-        parameters["Wcx"] = np.random.randn(n_a,n_x)
+        parameters["Wca"] = np.random.randn(n_a,n_a)*np.sqrt(2/(n_a+n_a))
+        parameters["Wcx"] = np.random.randn(n_a,n_x)*np.sqrt(2/(n_a+n_x))
         parameters["bc"] = np.zeros((n_a,1))
 
-        parameters["Wua"] = np.random.randn(n_a,n_a)
-        parameters["Wux"] = np.random.randn(n_a,n_x)
-        parameters["Wuc"] = np.random.randn(n_a,n_a)
+        parameters["Wua"] = np.random.randn(n_a,n_a)*np.sqrt(2/(n_a+n_a))
+        parameters["Wux"] = np.random.randn(n_a,n_x)*np.sqrt(2/(n_a+n_x))
+        parameters["Wuc"] = np.random.randn(n_a,n_a)*np.sqrt(2/(n_a+n_a))
         parameters["bu"] = np.zeros((n_a,1))
 
-        parameters["Wfa"] = np.random.randn(n_a,n_a)
-        parameters["Wfx"] = np.random.randn(n_a,n_x)
-        parameters["Wfc"] = np.random.randn(n_a,n_a)
+        parameters["Wfa"] = np.random.randn(n_a,n_a)*np.sqrt(2/(n_a+n_a))
+        parameters["Wfx"] = np.random.randn(n_a,n_x)*np.sqrt(2/(n_a+n_x))
+        parameters["Wfc"] = np.random.randn(n_a,n_a)*np.sqrt(2/(n_a+n_a))
         parameters["bf"] = np.zeros((n_a,1))
 
-        parameters["Woa"] = np.random.randn(n_a,n_a)
-        parameters["Wox"] = np.random.randn(n_a,n_x)
-        parameters["Woc"] = np.random.rand(n_a,n_a)
+        parameters["Woa"] = np.random.randn(n_a,n_a)*np.sqrt(2/(n_a+n_a))
+        parameters["Wox"] = np.random.randn(n_a,n_x)*np.sqrt(2/(n_a+n_x))
+        parameters["Woc"] = np.random.rand(n_a,n_a)*np.sqrt(2/(n_a+n_a))
         parameters["bo"] = np.zeros((n_a,1))
 
-        parameters["Wya"] = np.random.randn(n_y,n_a)
+        parameters["Wya"] = np.random.randn(n_y,n_a)*np.sqrt(2/(n_a+n_y))
         parameters["by"] = np.zeros((n_y,1))
 
         return parameters
